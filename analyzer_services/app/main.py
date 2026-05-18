@@ -54,7 +54,7 @@ services = FastAPI(
 )
 
 services.mount("/static/reports", StaticFiles(directory=REPORTS_DIR), name="reports")
-services.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"])
+services.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"],)
 # Incluir rutas de la API
 services.include_router(router)
 services.include_router(auth_router, prefix="/api")
