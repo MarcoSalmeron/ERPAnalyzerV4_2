@@ -102,39 +102,21 @@ def tool_obtener_config_bot(nombre_bot: str) -> dict:
         logger.error(f"[config_bots] --> Error: {e}")
         raise
 
+
 @tool
-def tool_pdf_a_excel_base64(thread_id: str) -> dict:
+def tool_xlsx_a_base64(file_path: str) -> dict:
     """
-    Lee el PDF generado para el thread_id, extrae las tablas,
-    las convierte a Excel (.xlsx) y retorna el archivo en base64.
+    Lee un archivo .xlsx desde la ruta indicada y lo retorna en base64.
     """
-    ruta_pdf = f"./reports/reporte_{thread_id}.pdf"
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"Archivo no encontrado: {file_path}")
 
-    if not os.path.exists(ruta_pdf):
-        raise FileNotFoundError(f"PDF no encontrado en {ruta_pdf}")
+    with open(file_path, "rb") as f:
+        contenido_b64 = base64.b64encode(f.read()).decode("utf-8")
 
-    wb = openpyxl.Workbook()
-    wb.remove(wb.active)
-
-    with pdfplumber.open(ruta_pdf) as pdf:
-        for i, page in enumerate(pdf.pages):
-            tables = page.extract_tables()
-            for j, table in enumerate(tables):
-                ws = wb.create_sheet(title=f"Pag{i + 1}_T{j + 1}")
-                for row in table:
-                    ws.append([cell or "" for cell in row])
-
-    if not wb.sheetnames:
-        ws = wb.create_sheet(title="Reporte")
-        ws.append(["No se encontraron tablas en el PDF"])
-
-    buffer = io.BytesIO()
-    wb.save(buffer)
-    buffer.seek(0)
-    contenido_b64 = base64.b64encode(buffer.read()).decode("utf-8")
-
-    logger.info(f"[Excel] --> Excel generado para {thread_id} ({len(contenido_b64)} chars)")
+    logger.info(f"[xlsx_a_base64] --> Archivo {file_path} convertido ({len(contenido_b64)} chars)")
     return {"content": contenido_b64, "tipo": "xlsx"}
+
 
 @tool
 def tool_obtener_bots_disponibles() -> List[str]:

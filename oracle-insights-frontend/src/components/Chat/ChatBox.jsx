@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import MessageItem from './MessageItem';
+import { api } from '../../api/apiConfig';
 
-const ChatBox = ({ messages, onStartAnalysis, resumeAnalysis, isAnalyzing, pdfUrl  }) => {
+const ChatBox = ({ messages, onStartAnalysis, resumeAnalysis, isAnalyzing, pdfUrl, threadId  }) => {
   const [input, setInput] = useState('');
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
@@ -24,12 +25,22 @@ const handleFileChange = (e) => {
     scrollToBottom();
   }, [messages]);
 
-const handleSubmit = (e) => {
+const handleSubmit = async (e) => {
   e.preventDefault();
-  if (!input.trim() || isAnalyzing) return;
+  if (!input.trim() && !attachedFile) return; // ← solo bloquear si no hay nada
+  if (isAnalyzing) return;
 
   const query = input.trim();
   setInput('');
+
+    if (attachedFile) {
+    const formData = new FormData();
+    formData.append('file', attachedFile);
+    await api.post(`/impact/upload-file/${threadId}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    setAttachedFile(null);
+  }
 
   const lastMsg = messages[messages.length - 1];
   // Interrupciones
@@ -126,7 +137,7 @@ const handleSubmit = (e) => {
             {/* Botón de envío */}
             <button
               type="submit"
-              disabled={!input.trim() || isAnalyzing}
+              disabled={(!input.trim() && !attachedFile) || isAnalyzing}
               className="btn-primary px-6"
             >
               {isAnalyzing ? (

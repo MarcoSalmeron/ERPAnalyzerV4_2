@@ -35,6 +35,34 @@ const MessageItem = ({ message }) => {
     });
   };
 
+if (message.type === "screenshots") {
+  return (
+    <div className="flex justify-start animate-in">
+      <div className="bg-oracle-border text-oracle-muted rounded-lg p-3 w-full">
+        <p className="text-sm text-center mb-2">{message.content}</p>
+        <div className="flex flex-wrap gap-3 justify-center">
+          {message.screenshots?.map((url, i) => (
+            <div key={i} className="flex flex-col items-center gap-1">
+              <img
+                src={url}
+                alt={`Captura ${i + 1}`}
+                className="w-24 h-24 object-cover rounded border border-oracle-border cursor-pointer"
+              />
+              <a
+                href={url}
+                download={`captura_${i + 1}.png`}
+                className="text-xs text-oracle-accent underline"
+              >
+                Descargar {i + 1}
+              </a>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
   return (
     <div 
       className={`

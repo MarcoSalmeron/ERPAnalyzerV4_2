@@ -72,30 +72,11 @@ async function resumeAnalysis(respuesta) {
   }, []);
 
   const handleWebSocketMessage = useCallback((data) => {
-   console.log('📨 Mensaje recibido:', data);
-
-  const { step, agent, status, content, log, pdf_ready, pdf_url } = data;
-
-  if (data.error) {
-    setError(data.error);
-    setIsAnalyzing(false);
-    return;
-  }
-
-  if (content && agent === 'supervisor') {
-    setIsAnalyzing(false);
-  }
-
-    if (data.type === "chat") {
-  setIsAnalyzing(false);  // Habilitar el input
-  setMessages(prev => [...prev, {
-    id: Date.now(),
-    agent: data.agent || 'supervisor',
-    content: data.content,
-    timestamp: new Date().toISOString(),
-  }]);
-  return;
-}
+    if (data.error) {
+      setError(data.error);
+      setIsAnalyzing(false);
+      return;
+    }
 
     if (data.type === "error") {
   setIsAnalyzing(false);
@@ -138,6 +119,20 @@ if (data.type === "info") {
   }]);
   return;
 }
+
+if (data.type === "screenshots") {
+  setMessages(prev => [...prev, {
+    id: Date.now(),
+    agent: "system",
+    type: "screenshots",
+    content: data.content,
+    screenshots: data.screenshots,   // array de URLs /static/reports/...
+    timestamp: new Date().toISOString(),
+  }]);
+  return;
+}
+
+    const { step, agent, status, content, log, pdf_ready, pdf_url } = data;
 
     if (step) {
       setCurrentStep(step);
@@ -182,21 +177,21 @@ if (data.type === "info") {
     setMessages(prev => [
       ...prev,
       { id: Date.now(), agent: 'user', content: query, timestamp: new Date().toISOString() },
-      { id: Date.now() + 1, agent: 'system', content: 'Conectando con el agente...', timestamp: new Date().toISOString() }
+      { id: Date.now() + 1, agent: 'system', content: 'Iniciando análisis...', timestamp: new Date().toISOString() }
     ]);
 
     try {
-      const response = await createAnalysis(query, threadIdRef.current);
+      const response = await createAnalysis(query);
       const { thread_id } = response;
       threadIdRef.current = thread_id;
       connectWebSocket(thread_id);
 
       setMessages(prev => [...prev, {
-      id: Date.now() + 2,
-      agent: 'system',
-      content: 'Agente conectado.',
-      timestamp: new Date().toISOString(),
-        }]);
+        id: Date.now() + 2,
+        agent: 'system',
+        content: `Análisis iniciado. Thread ID: ${thread_id}`,
+        timestamp: new Date().toISOString(),
+      }]);
     } catch (err) {
       setError(err.response?.data?.detail || 'Error al iniciar el análisis');
       setIsAnalyzing(false);
@@ -226,6 +221,7 @@ if (data.type === "info") {
 
   return {
     isAnalyzing,
+    threadId: threadIdRef.current,
     currentStep,
     agentStatuses,
     messages,

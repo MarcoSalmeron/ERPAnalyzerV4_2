@@ -18,6 +18,9 @@ PLANTILLAS_DIR = Path(__file__).parent.parent.parent / "static" / "plantillas"
 if not os.path.exists(PLANTILLAS_DIR):
     os.makedirs(PLANTILLAS_DIR)
 
+REPORTS_DIR = Path(__file__).parent.parent.parent / "static" / "reports"
+os.makedirs(REPORTS_DIR, exist_ok=True)
+
 REPORTS_DIR = Path(__file__).parent.parent.parent / "reports"
 if not os.path.exists(REPORTS_DIR):
     os.makedirs(REPORTS_DIR)
@@ -54,7 +57,7 @@ services = FastAPI(
 )
 
 services.mount("/static/reports", StaticFiles(directory=REPORTS_DIR), name="reports")
-services.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"],)
+services.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"])
 # Incluir rutas de la API
 services.include_router(router)
 services.include_router(auth_router, prefix="/api")

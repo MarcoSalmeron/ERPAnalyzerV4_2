@@ -26,6 +26,7 @@ function App() {
     isAnalyzing, currentStep, agentStatuses,
     messages, pdfUrl, error, startAnalysis,
     resetWorkflow, resumeAnalysis,
+    threadId
     } = useOracleWorkflow();
 
   if (!isAuthenticated) {
@@ -64,6 +65,7 @@ function App() {
             onStartAnalysis={startAnalysis}
             resumeAnalysis={resumeAnalysis}  // ← Human in the Loop
             isAnalyzing={isAnalyzing}
+            threadId={threadId}
           />
         </section>
 
