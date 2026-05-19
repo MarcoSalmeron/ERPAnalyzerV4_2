@@ -12,6 +12,8 @@ import base64
 from pathlib import Path
 import uuid
 import os
+from PIL import Image
+import io
 
 # ===============================
 # LOGGING
@@ -23,8 +25,8 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-REPORTS_DIR = Path(__file__).parent.parent.parent.parent / "static" / "reports"
-os.makedirs(REPORTS_DIR, exist_ok=True)
+SCREENSHOTS_DIR = Path(__file__).parent.parent.parent.parent / "static" / "reports"
+os.makedirs(SCREENSHOTS_DIR, exist_ok=True)
 
 ##memory = MemorySaver()
 ##oracle_app = team.compile(checkpointer=checkpointer)
@@ -166,10 +168,15 @@ async def run_oracle_analysis(thread_id: str, query: str, oracle_app):
 
                                         filename = screenshot.get(
                                             "filename") or f"screenshot_{execution_id}_{uuid.uuid4().hex[:8]}.png"
-                                        filepath = REPORTS_DIR / filename
+                                        filepath = SCREENSHOTS_DIR / filename
                                         img_bytes = base64.b64decode(b64_str)
-                                        with open(filepath, "wb") as f:
-                                            f.write(img_bytes)
+                                        img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+
+                                        # Forzar extensión .jpg
+                                        filename = (screenshot.get(
+                                            "filename") or f"screenshot_{execution_id}_{uuid.uuid4().hex[:8]}").rsplit(
+                                            ".", 1)[0] + ".jpg"
+                                        img.save(filepath, "JPEG", quality=85)
                                         screenshot_urls.append(f"/static/reports/{filename}")
 
                                     await manager.send_update(thread_id, {

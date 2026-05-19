@@ -1,4 +1,5 @@
 import React from 'react';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 const getAgentLabel = (agent) => {
   const labels = {
@@ -43,16 +44,16 @@ if (message.type === "screenshots") {
         <div className="flex flex-wrap gap-3 justify-center">
           {message.screenshots?.map((url, i) => (
             <div key={i} className="flex flex-col items-center gap-1">
-              <img
-                src={url}
-                alt={`Captura ${i + 1}`}
-                className="w-24 h-24 object-cover rounded border border-oracle-border cursor-pointer"
-              />
-              <a
-                href={url}
-                download={`captura_${i + 1}.png`}
-                className="text-xs text-oracle-accent underline"
-              >
+                <img
+                  src={`${API_BASE_URL}${url}`}
+                  alt={`Captura ${i + 1}`}
+                  className="w-24 h-24 object-cover rounded border border-oracle-border cursor-pointer"
+                />
+                <a
+                  href={`${API_BASE_URL}${url}`}
+                  download={`captura_${i + 1}.jpg`}   // ← cambiar a .jpg
+                  className="text-xs text-oracle-accent underline"
+                >
                 Descargar {i + 1}
               </a>
             </div>
