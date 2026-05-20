@@ -156,6 +156,16 @@ async def run_oracle_analysis(thread_id: str, query: str, oracle_app):
                                     if status == "completed":
                                         screenshots = poll_data.get("screenshots", [])
                                         break
+                                    elif status in ("failed", "timeout", "cancelled"):
+                                        message = poll_data.get("message", "").lower()
+                                        await manager.send_update(thread_id, {
+                                            "type": "info",
+                                            "agent": "system",
+                                            "content": f"Fallo en la ejecución: {status} = {message}",
+                                        })
+                                        await manager.close_connection(thread_id)
+                                        break
+
 
                                     await asyncio.sleep(30)  # reintentar cada 30 segundos
 
@@ -166,16 +176,14 @@ async def run_oracle_analysis(thread_id: str, query: str, oracle_app):
                                         if not b64_str:
                                             continue
 
-                                        filename = screenshot.get(
-                                            "filename") or f"screenshot_{execution_id}_{uuid.uuid4().hex[:8]}.png"
-                                        filepath = SCREENSHOTS_DIR / filename
+                                        # Calcular nombre final .jpg primero
+                                        raw_name = screenshot.get(
+                                            "filename") or f"screenshot_{execution_id}_{uuid.uuid4().hex[:8]}"
+                                        filename = raw_name.rsplit(".", 1)[0] + ".jpg"
+                                        filepath = SCREENSHOTS_DIR / filename  # ← ahora filepath ya tiene .jpg
+
                                         img_bytes = base64.b64decode(b64_str)
                                         img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
-
-                                        # Forzar extensión .jpg
-                                        filename = (screenshot.get(
-                                            "filename") or f"screenshot_{execution_id}_{uuid.uuid4().hex[:8]}").rsplit(
-                                            ".", 1)[0] + ".jpg"
                                         img.save(filepath, "JPEG", quality=85)
                                         screenshot_urls.append(f"/static/reports/{filename}")
 
@@ -299,8 +307,22 @@ async def run_oracle_analysis(thread_id: str, query: str, oracle_app):
                     logger.info(f"📋 Respuesta pruebas de regresión: {respuesta_regresion}")
 
                     # ── 4. Procesar respuesta y notificar al frontend ─────────
-                    if respuesta_regresion.strip().lower() in ("sí", "si", "s", "yes", "y"):
+                    if any(x in respuesta_regresion for x in ("si", "sí", "Si", "Sí", "s", "y", "yes", "SI", "SÍ")):
+                        await manager.send_update(thread_id, {
+                            "type": "info",
+                            "agent": "supervisor",
+                            "content": "Para ejecutar pruebas de regresión, descarga las plantillas (en el panel derecho) y adjúntalas usando el botón 📎 al lado del input del chat."
+                        })
+                        await manager.send_update(thread_id, {
+                            "type": "interrupt",
+                            "agent": "supervisor",
+                            "content": "Cuando tengas el archivo listo, adjúntalo y presiona enviar."
+                        })
+                        # Esperar el archivo del usuario (mismo thread_id)
+                        while thread_id not in pending_responses:
+                            await asyncio.sleep(0.5)
 
+                        # Procesar archivo
                         try:
                             # 1. Convertir Xlsx en base64
                             file_path = pending_responses.pop(f"{thread_id}_file_path", None)
@@ -343,11 +365,72 @@ async def run_oracle_analysis(thread_id: str, query: str, oracle_app):
                                 )
 
                             if resp.status_code == 200:
+
+                                # 1. Capturar execution_id
+                                bot_response = resp.json()
+                                execution_id = bot_response.get("execution_id")
+
                                 await manager.send_update(thread_id, {
                                     "type": "info",
                                     "agent": "system",
-                                    "content": f"Pruebas de regresión iniciadas correctamente en {config_bot['nombre_bot']}."
+                                    "content": "Bot iniciado. Esperando 5 minutos para verificar resultados..."
                                 })
+
+                                # 2. Esperar 5 minutos
+                                await asyncio.sleep(300)
+
+                                # 3. Polling hasta status == "completed"
+                                screenshots_endpoint = f"https://boot-app.i-condor.com/api/executions/{execution_id}/screenshots"
+                                screenshots = []
+                                max_retries = 20  # máximo ~10 minutos adicionales con 30s de intervalo
+
+                                for _ in range(max_retries):
+                                    async with httpx.AsyncClient() as poll_client:
+                                        poll_resp = await poll_client.get(
+                                            screenshots_endpoint,
+                                            headers={"Authorization": f"Bearer {token}"}
+                                        )
+                                    poll_data = poll_resp.json()
+                                    status = poll_data.get("execution", {}).get("status", "").lower()
+
+                                    if status == "completed":
+                                        screenshots = poll_data.get("screenshots", [])
+                                        break
+                                    elif status in ("failed", "timeout", "cancelled"):
+                                        message = poll_data.get("message", "").lower()
+                                        await manager.send_update(thread_id, {
+                                            "type": "info",
+                                            "agent": "system",
+                                            "content": f"Fallo en la ejecución: {status} = {message}",
+                                        })
+                                        break
+
+                                    await asyncio.sleep(30)  # reintentar cada 30 segundos
+
+                                if screenshots:
+                                    screenshot_urls = []
+                                    for screenshot in screenshots:
+                                        b64_str = screenshot.get("data")  # ← campo correcto del dict
+                                        if not b64_str:
+                                            continue
+
+                                        # Calcular nombre final .jpg primero
+                                        raw_name = screenshot.get(
+                                            "filename") or f"screenshot_{execution_id}_{uuid.uuid4().hex[:8]}"
+                                        filename = raw_name.rsplit(".", 1)[0] + ".jpg"
+                                        filepath = SCREENSHOTS_DIR / filename  # ← ahora filepath ya tiene .jpg
+
+                                        img_bytes = base64.b64decode(b64_str)
+                                        img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+                                        img.save(filepath, "JPEG", quality=85)
+                                        screenshot_urls.append(f"/static/reports/{filename}")
+
+                                    await manager.send_update(thread_id, {
+                                        "type": "screenshots",
+                                        "agent": "system",
+                                        "content": f"Ejecución completada. {len(screenshot_urls)} captura(s) disponible(s).",
+                                        "screenshots": screenshot_urls
+                                    })
                             else:
                                 await manager.send_update(thread_id, {
                                     "type": "info",
@@ -361,6 +444,9 @@ async def run_oracle_analysis(thread_id: str, query: str, oracle_app):
                                 "agent": "system",
                                 "content": f"Error técnico al ejecutar pruebas: {str(e)}"
                             })
+                        finally:
+                            await manager.close_connection(thread_id)
+                            break
                     else:
                         await manager.send_update(thread_id, {
                             "type": "info",
